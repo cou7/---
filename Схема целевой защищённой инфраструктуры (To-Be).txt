@@ -1,0 +1,54 @@
+flowchart TD
+    subgraph "Интернет"
+        Users((Читатели))
+        Remote((Удалённые сотрудники))
+        Cloud[(Anti-DDoS / CDN)]
+    end
+    
+    subgraph "DMZ (Защищённый периметр)"
+        WAF[WAF (UserGate / ModSecurity)]
+        Web2[Web-сервер]
+    end
+    
+    subgraph "Application Zone (VLAN 20)"
+        APP2[Сервер приложений]
+    end
+    
+    subgraph "Data Zone (VLAN 30, изолированная)"
+        DB2[(СУБД, шифрование at-rest)]
+    end
+    
+    subgraph "Офис (сегментированная сеть)"
+        FW_Office[NGFW (UserGate / OPNsense)]
+        VLAN_USER[VLAN 10: АРМ сотрудников]
+        VLAN_SRV[VLAN 20: Серверы (1С, Файлы)]
+        VLAN_ADMIN[VLAN 30: Администрирование]
+    end
+    
+    subgraph "Защита конечных точек и мониторинг"
+        EDR[Kaspersky EDR / Wazuh]
+        SIEM[(MaxPatrol SIEM / Wazuh)]
+    end
+    
+    subgraph "Неизменяемое хранилище (VLAN 40)"
+        Backup2[Immutable Backup]
+        Offline[(Offline-лента / Air-gap)]
+    end
+    
+    Users --> Cloud --> WAF
+    WAF --> Web2
+    Web2 --> APP2
+    APP2 -->|mTLS, только порт СУБД| DB2
+    
+    Remote -->|VPN + MFA| FW_Office
+    FW_Office --> VLAN_USER
+    FW_Office --> VLAN_SRV
+    FW_Office --> VLAN_ADMIN
+    
+    VLAN_USER --> EDR
+    VLAN_SRV --> SIEM
+    VLAN_ADMIN --> SIEM
+    WAF -.->|Сбор логов| SIEM
+    
+    DB2 -.->|"Правило 3-2-1"| Backup2
+    DB2 -.->|Еженедельно| Offline
